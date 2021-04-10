@@ -1,5 +1,6 @@
 import sys 
 from math import ceil, log2
+import IP_Class
 
 bitPattern = { 
     '00000000': 0,
@@ -68,78 +69,9 @@ def binary_to_decimal( string ):
     return total
 
 
-
-
-
-class ipAddress:
-    def __init__(self, oct1, oct2, oct3, oct4, mask=False, hosts=None ):
-        self.oct1 = oct1 if type( oct1 ) == str else decimal_to_binary( oct1 )
-        self.oct2 = oct2 if type( oct2 ) == str else decimal_to_binary( oct2 )
-        self.oct3 = oct3 if type( oct3 ) == str else decimal_to_binary( oct3 )
-        self.oct4 = oct4 if type( oct4 ) == str else decimal_to_binary( oct4 )
-
-        self.CIDR = None
-        self.subnetMask = None
-
-
-        if mask:
-            self.CIDR = 32 - ( ceil( log2( hosts ) ) ) 
-            self.subnetMask = self.generateSubnetMask()
-
-    def __str__(self):
-        return f"{ binary_to_decimal( self.oct1 ) }.{ binary_to_decimal( self.oct2 ) }.{ binary_to_decimal( self.oct3 ) }.{ binary_to_decimal( self.oct4 ) }"
-
-    def updateCIDR(self, hosts ):
-        self.CIDR = 32 - ( ceil( log2( hosts ) ) )
-
-    def generateSubnetMask(self):
-        lst = []
-        index = self.CIDR
-
-        while index > 0:
-
-            if index - 8 > 0:
-                lst.append( decimal_to_binary( 255 ) )
-            else:
-                tmp = "1" * index + "0" * ( 8 - index )
-                lst.append( decimal_to_binary( bitPattern[ tmp ] ) )
-            
-            index = index - 8
-
-        if len( lst ) < 4:
-            lst.append( decimal_to_binary( 0 ) )
-
-        return ipAddress( bitPattern[ lst[0] ], bitPattern[ lst[1] ], bitPattern[ lst[2] ], bitPattern[ lst[3] ] )
-    
-    def addOneToAddress(self):
-        tmp = self.oct1 + self.oct2 + self.oct3 + self.oct4
-        answer = ''
-
-        index = 31
-        while index >= 0:
-            if tmp[ index ] == "0":
-                answer = '1' + answer
-                break
-            else: # found a 1
-                answer = '0' + answer
-            index -= 1
-        
-        if len( answer ) < 32:
-            answer = tmp[0 : index ] + answer
-
-        return ipAddress( answer[0 : 8], answer[8 : 16], answer[16 : 24], answer[24 : 32] )
-        
-
-
-
-def generate_table( deptLst, ipAddress):
+def generate_table( deptLst, ip_Address):
     deptLst = sorted( deptLst, key=lambda value: value[1], reverse=True )
-    print( deptLst )
-
-    # lst = [ [] for _ in range(0, len( deptLst ) + 1) ]
     lst = [ ] 
-
-    print( ipAddress )
 
     for index, department in enumerate( deptLst ):
         tmp = []
@@ -147,9 +79,10 @@ def generate_table( deptLst, ipAddress):
         subnetAddress = None
 
         if index != 0:
-            pass
+            lastDepartmentBroadcastAddress = lst[ index - 1][5]
+            subnetAddress = lastDepartmentBroadcastAddress.addOneToAddress()
         else:
-            subnetAddress = ipAddress
+            subnetAddress = ip_Address
         
 
         tmp.append( department[0] ) # gives the lst the depart ID
@@ -159,38 +92,47 @@ def generate_table( deptLst, ipAddress):
         mask = subnetAddress.generateSubnetMask()
 
         tmp.append( mask ) # adds the subnet mask to the lst
-
         tmp.append( subnetAddress.CIDR ) # adds the CIDR value to the lst
 
 
         ### address range
+        addressRangeStart = subnetAddress.addOneToAddress()
 
+        BroadcastAddress = addressRangeStart.getBroadcastAddress( mask )
 
+        addressRangeEnd = ipAddress( BroadcastAddress.oct1, BroadcastAddress.oct2, BroadcastAddress.oct3, binary_to_decimal( BroadcastAddress.oct4 ) - 1 )
+
+        tmp.append( ( addressRangeStart, addressRangeEnd ) )
+
+        tmp.append( BroadcastAddress )
     
+        lst.append( tmp )
 
 
-        for el in tmp:
-            print( el )
+    lst = sorted( lst, key=lambda value: value[0] )
 
-        sys.exit( 123 )
+    print( "Department  | Subnet Address     | Subnet Mask       | CIDR   | Address Range                      | Broadcast Address" )
 
+    for block in lst:
+        for index, info in enumerate( block ):
 
-    # print( lst )
+            if index == 4:
+                print( f" { info[0] } to { info[1]} ", end="")
+            elif index > 0:
+                print( f"    { info }    ", end="" )
+            else:
+                print( f"    {info } ", end="" )
+        print()
 
 
 
 
 def main():
-    deptLst = [ ('A', 500), ('B', 205), ('C', 100), ('D', 80) ]
-
-    
-    address = ipAddress( 156, 31, 28, 0, True, hosts=500 )
-    print( address )
-
-    print( address.addOneToAddress() )
-
-    # print( address.subnetMask )
+    # deptLst = [ ('A', 500), ('B', 205), ('C', 100), ('D', 80) ]
     # generate_table( deptLst, ipAddress( 156, 31, 28, 0) )
+
+    deptLst = [ ('A', 526), ('B', 275), ('C', 140), ('D', 240), ('E', 100) ]
+    generate_table( deptLst, ipAddress( 192, 0, 0, 0) )
 
 
 
